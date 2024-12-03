@@ -70,17 +70,25 @@ The AttendEase-Backend is an API-driven backend service for managing attendance 
 
 ## **Installation**
 
--1. Clone the repository:
-   `git clone https://github.com/NishantRajhans/AttendEase-Backend.git`
--2. Install dependencies:
-   `npm install`
--3.Configure environment variables in a .env file:
-   `PORT=your_port_number
-    DATABASE_HOST=your_database_host
-    DATABASE_USER=your_database_user
-    DATABASE_PASSWORD=your_database_password
-    DATABASE_NAME=your_database_name
-    JWT_SECRET=your_jwt_secret
-`
--4.Start the server:
-    `npm start`
+### 1. Clone the repository:
+```bash
+git clone https://github.com/NishantRajhans/AttendEase-Backend.git
+2. Install dependencies:
+bash
+Copy code
+npm install
+3. Configure environment variables in a .env file.
+Create a .env file in the root directory and add the following:
+
+makefile
+Copy code
+PORT=your_port_number
+DATABASE_HOST=your_database_host
+DATABASE_USER=your_database_user
+DATABASE_PASSWORD=your_database_password
+DATABASE_NAME=your_database_name
+JWT_SECRET=your_jwt_secret
+4. Start the server:
+bash
+Copy code
+npm start
