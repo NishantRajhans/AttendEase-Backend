@@ -64,6 +64,32 @@ VALUE(?,?,?,?,?)`;
     });
   }
 };
+export const RemoveAttendance = async(req, res) =>{
+  try{
+    const { STUDENT_ID, SUBJECT_ID, ATTENDANCE_DATE } =
+      req.query;
+    const {TEACHER_ID}=req.user
+    console.log(STUDENT_ID, SUBJECT_ID, ATTENDANCE_DATE,TEACHER_ID)
+    const DB = await DbConnection();
+    const SQL = `DELETE FROM ATTENDANCE WHERE STUDENT_ID = ? AND SUBJECT_ID = ? AND TEACHER_ID = ? AND ATTENDANCE_DATE = ?`;
+    const response = await DB.query(SQL, [
+      STUDENT_ID,
+      SUBJECT_ID,
+      TEACHER_ID,
+      ATTENDANCE_DATE,
+    ]);
+    return res.json({
+      response: response,
+      message: "Remove Attendance successful",
+    });
+  }catch(err){
+    console.log("Error in Remove Attendance", err);
+    return res.status(400).json({
+      message: "Error in Remove Attendance",
+      success: false,
+    });
+  }
+}
 export const FetchAttendance = async (req, res) => {
   try {
     const { Subject, Month, Year } = req.query;
@@ -137,25 +163,6 @@ ORDER BY
     console.log("Error in signin", err);
     return res.status(400).json({
       message: "Error in signin",
-      success: false,
-    });
-  }
-};
-export const FetchStudents = async (req, res) => {
-  try {
-    const { SUBJECT_ID } = req.query;
-    const DB = await DbConnection();
-    const SQL = `SELECT * FROM STUDENT WHERE GRADE IN( SELECT GRADE_ID FROM GRADE_SUBJECT WHERE SUBJECT_ID=?);`;
-    const response = await DB.query(SQL, [SUBJECT_ID]);
-    return res.json({
-      message: "Fetch Students successfully",
-      response: response[0],
-      success: true,
-    });
-  } catch (err) {
-    console.log("Error in Fetch Students", err);
-    return res.status(400).json({
-      message: "Error in Fetch Students",
       success: false,
     });
   }
