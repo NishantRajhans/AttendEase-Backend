@@ -77,6 +77,11 @@ The AttendEase-Backend is an API-driven backend service for managing attendance 
    `npm install`
 3.Configure environment variables in a .env file:
    `PORT=your_port_number
-    DB_URI=your_database_connection_string`
+    DATABASE_HOST=your_database_host
+    DATABASE_USER=your_database_user
+    DATABASE_PASSWORD=your_database_password
+    DATABASE_NAME=your_database_name
+    JWT_SECRET=your_jwt_secret
+`
 4.Start the server:
     `npm start`
