@@ -7,7 +7,7 @@ export const SignIn = async (req, res) => {
       const SQL = `SELECT NAME,TEACHER_ID, EMAIL FROM TEACHER WHERE EMAIL = ? AND PASSWORD = ?;`;
       const [rows] = await DB.query(SQL, [EMAIL, PASSWORD]);
       if (rows.length === 0) {
-        return res.status(400).json({
+        return res.status(200).json({
           message: "Invalid credentials",
           success: false,
         });
@@ -27,7 +27,7 @@ export const SignIn = async (req, res) => {
         token,
         user,
         role:"Teacher",
-        message: "Admin login successful",
+        message: "Teacher login successful",
       });
     } catch (err) {
       console.log("Error in signin", err);

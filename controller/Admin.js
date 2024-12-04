@@ -6,9 +6,8 @@ export const SignIn = async (req, res) => {
     const DB = await DbConnection();
     const SQL = `SELECT NAME,ADMIN_ID, EMAIL FROM ADMINISTRATOR WHERE EMAIL = ? AND PASSWORD = ?;`;
     const [rows] = await DB.query(SQL, [EMAIL, PASSWORD]);
-    console.log(EMAIL, PASSWORD, ROLE, rows);
     if (rows.length === 0) {
-      return res.status(400).json({
+      return res.status(200).json({
         message: "Invalid credentials",
         success: false,
       });
