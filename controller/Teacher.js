@@ -186,3 +186,21 @@ export const FetchSubject = async (req, res) => {
     });
   }
 };
+export const FetchStudentOfParticularSubject=async(req,res)=>{
+  try{
+    const {SUBJECT_ID}=req.query;
+    const DB=await DbConnection()
+    const SQL=`SELECT STUDENT_ID, NAME FROM STUDENT WHERE GRADE IN( SELECT GRADE_ID FROM GRADE_SUBJECT WHERE SUBJECT_ID=?);`
+    const [rows]= await DB.query(SQL, [SUBJECT_ID]);
+    return res.status(200).json({
+      response:rows,
+      message:"Student fetch Successfully",
+      success:true,
+    });
+  }catch(err){
+    return res.status(400).json({
+      message: "Error in FetchStudentOfParticularSubject",
+      success: false,
+    });
+  }
+}
