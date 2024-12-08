@@ -64,12 +64,44 @@ VALUE(?,?,?,?,?)`;
     });
   }
 };
+export const PutAttendanceFromBot = async (req, res) => {
+  try {
+    const { STUDENT_ID, SUBJECT_ID, PRESENT, ATTENDANCE_DATE } =
+      req.body;
+    const {TEACHER_ID}=req.user
+    const DB = await DbConnection();
+    const FindSQL=`SELECT * FROM ATTENDANCE SUBJECT_ID=? AND TEACHER_ID=? AND ATTENDANCE_DATE=?;`
+    const [rows]=DB.query(FindSQL,[SUBJECT_ID,TEACHER_ID,ATTENDANCE_DATE])
+    if(rows.length>0){
+      return res.json({
+        message: "Attendance of this date and subject is already taken.",
+      });
+    }
+    const SQL = `INSERT INTO ATTENDANCE (STUDENT_ID, SUBJECT_ID, TEACHER_ID, PRESENT, ATTENDANCE_DATE)
+VALUE(?,?,?,?,?)`;
+    const response = await DB.query(SQL, [
+      STUDENT_ID,
+      SUBJECT_ID,
+      TEACHER_ID,
+      PRESENT,
+      ATTENDANCE_DATE,
+    ]);
+    return res.json({
+      message: "Put Attendance successful",
+    });
+  } catch (err) {
+    console.log("Error in Put Attendance", err);
+    return res.status(400).json({
+      message: "Error in Put Attendance",
+      success: false,
+    });
+  }
+};
 export const RemoveAttendance = async(req, res) =>{
   try{
     const { STUDENT_ID, SUBJECT_ID, ATTENDANCE_DATE } =
       req.query;
     const {TEACHER_ID}=req.user
-    console.log(STUDENT_ID, SUBJECT_ID, ATTENDANCE_DATE,TEACHER_ID)
     const DB = await DbConnection();
     const SQL = `DELETE FROM ATTENDANCE WHERE STUDENT_ID = ? AND SUBJECT_ID = ? AND TEACHER_ID = ? AND ATTENDANCE_DATE = ?`;
     const response = await DB.query(SQL, [
@@ -152,8 +184,6 @@ GROUP BY
 ORDER BY 
     ATTENDANCE_DAY;`;
     const [rows] = await DB.query(SQL, [Subject,Month, Year,Subject,TEACHER_ID]);
-    console.log(Month, Year,Subject,TEACHER_ID)
-    console.log(rows);
     return res.json({
       message: "Fetch Attendance successfully",
       response: rows,

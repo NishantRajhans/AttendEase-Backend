@@ -46,6 +46,7 @@ export const AddTeacher = async (req, res) => {
     return res.json({
       response: response,
       message: "Add Teacher successful",
+      success: true
     });
   } catch (err) {
     console.log("Error in Add Teacher", err);
@@ -71,6 +72,7 @@ VALUE(?, ?, ?,?,?,?);`;
     ]);
     return res.json({
       message: "Add Student successful",
+      success:true
     });
   } catch (err) {
     console.log("Error in Add Student", err);
@@ -124,6 +126,7 @@ export const DeleteStudent = async (req, res) => {
     const response = await DB.query(SQL, [STUDENT_ID]);
     return res.json({
       message: "Delete Student successful",
+      success: true
     });
   } catch (err) {
     console.log("Error in Delete Student", err);
@@ -141,6 +144,7 @@ export const DeletTeacher = async (req, res) => {
     const response = await DB.query(SQL, [TEACHER_ID]);
     return res.json({
       message: "Delete Student successful",
+      success: true
     });
   } catch (err) {
     console.log("Error in Delete Student", err);
@@ -164,6 +168,7 @@ export const DeleteSubject = async (req, res) => {
     await DB.commit()
     return res.json({
       message: "Delete Subject successful",
+      success: true
     });
   } catch (err) {
     console.log("Error in Delete Subject", err);
@@ -183,6 +188,7 @@ export const GetAllStudent = async (req, res) => {
     return res.json({
       response: response[0],
       message: "Edit Student successful",
+      success: true
     });
   } catch (err) {
     console.log("Error in Edit Student", err);
@@ -200,6 +206,7 @@ export const GetAllTeacher = async (req, res) => {
     return res.json({
       response: response[0],
       message: "Get All Teacher successful",
+      success: true,
     });
   } catch (err) {
     console.log("Error in Get All Teacher", err);
@@ -238,6 +245,7 @@ ORDER BY
     return res.json({
       response: response[0],
       message: "Get All Subjects with grades and teachers successful",
+      success: true
     });
   } catch (err) {
     console.log("Error in Get All Subject", err);
@@ -255,6 +263,7 @@ export const GetAllGrade = async (rq, res) => {
     return res.json({
       response: response[0],
       message: "Get All Teacher successful",
+      success: true,
     });
   } catch (err) {
     console.log("Error in Get All Teacher", err);
@@ -281,6 +290,7 @@ export const EditStudent = async (req, res) => {
     ]);
     return res.json({
       message: "Edit Student successful",
+      success:true
     });
   } catch (err) {
     console.log("Error in Edit Student", err);
@@ -299,6 +309,7 @@ export const EditTeacher = async (req, res) => {
     const response = await DB.query(SQL, [NAME, EMAIL, PASSWORD, TEACHER_ID]);
     return res.json({
       message: "Edit Teacher successful",
+      success: true
     });
   } catch (err) {
     console.log("Error in Edit Teacher", err);
@@ -317,6 +328,7 @@ export const EditSubject = async (req, res) => {
     return res.json({
       response: response,
       message: "Edit Teacher successful",
+      success:true
     });
   } catch (err) {
     console.log("Error in Edit Teacher", err);
