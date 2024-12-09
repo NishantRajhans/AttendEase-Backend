@@ -43,35 +43,8 @@ export const PutAttendance = async (req, res) => {
       req.body;
     const {TEACHER_ID}=req.user
     const DB = await DbConnection();
-    const SQL = `INSERT INTO ATTENDANCE (STUDENT_ID, SUBJECT_ID, TEACHER_ID, PRESENT, ATTENDANCE_DATE)
-VALUE(?,?,?,?,?)`;
-    const response = await DB.query(SQL, [
-      STUDENT_ID,
-      SUBJECT_ID,
-      TEACHER_ID,
-      PRESENT,
-      ATTENDANCE_DATE,
-    ]);
-    return res.json({
-      response: response,
-      message: "Put Attendance successful",
-    });
-  } catch (err) {
-    console.log("Error in Put Attendance", err);
-    return res.status(400).json({
-      message: "Error in Put Attendance",
-      success: false,
-    });
-  }
-};
-export const PutAttendanceFromBot = async (req, res) => {
-  try {
-    const { STUDENT_ID, SUBJECT_ID, PRESENT, ATTENDANCE_DATE } =
-      req.body;
-    const {TEACHER_ID}=req.user
-    const DB = await DbConnection();
-    const FindSQL=`SELECT * FROM ATTENDANCE SUBJECT_ID=? AND TEACHER_ID=? AND ATTENDANCE_DATE=?;`
-    const [rows]=DB.query(FindSQL,[SUBJECT_ID,TEACHER_ID,ATTENDANCE_DATE])
+    const FindSQL=`SELECT * FROM ATTENDANCE WHERE SUBJECT_ID=? AND TEACHER_ID=? AND ATTENDANCE_DATE=? AND STUDENT_ID=?;`
+    const [rows]=await DB.query(FindSQL,[SUBJECT_ID,TEACHER_ID,ATTENDANCE_DATE,STUDENT_ID])
     if(rows.length>0){
       return res.json({
         message: "Attendance of this date and subject is already taken.",
@@ -87,6 +60,7 @@ VALUE(?,?,?,?,?)`;
       ATTENDANCE_DATE,
     ]);
     return res.json({
+      response: response,
       message: "Put Attendance successful",
     });
   } catch (err) {
@@ -126,21 +100,8 @@ export const FetchAttendance = async (req, res) => {
   try {
     const { Subject, Month, Year } = req.query;
     const DB = await DbConnection();
-    const SQL = `SELECT 
-    STUDENT.*, 
-    ATTENDANCE.ATTENDANCE_ID,
-    ATTENDANCE.PRESENT,
-    DAY(ATTENDANCE.ATTENDANCE_DATE) AS ATTENDANCE_DAY
-FROM 
-    STUDENT
-LEFT JOIN 
-    ATTENDANCE ON STUDENT.STUDENT_ID = ATTENDANCE.STUDENT_ID
-    AND MONTH(ATTENDANCE.ATTENDANCE_DATE) =?  -- Replace 10 with the target month
-    AND YEAR(ATTENDANCE.ATTENDANCE_DATE) = ?  -- Replace 2024 with the target year
-    AND ATTENDANCE.SUBJECT_ID = ?  -- Ensure the subject ID matches
-WHERE 
-    STUDENT.GRADE IN (SELECT GRADE_ID FROM GRADE_SUBJECT WHERE SUBJECT_ID = ?);`;
-    const [rows] = await DB.query(SQL, [Month, Year, Subject, Subject]);
+    const SQL = `SELECT * FROM ATTENDANCE WHERE SUBJECT_ID=? AND MONTH(ATTENDANCE_DATE)= ? AND YEAR(ATTENDANCE_DATE)=? ORDER BY (ATTENDANCE_DATE);`
+    const [rows] = await DB.query(SQL, [Subject,Month,Year]);
     if (rows.length === 0) {
       return res.status(200).json({
         message: "Invalid credentials",
@@ -220,7 +181,7 @@ export const FetchStudentOfParticularSubject=async(req,res)=>{
   try{
     const {SUBJECT_ID}=req.query;
     const DB=await DbConnection()
-    const SQL=`SELECT STUDENT_ID, NAME FROM STUDENT WHERE GRADE IN( SELECT GRADE_ID FROM GRADE_SUBJECT WHERE SUBJECT_ID=?);`
+    const SQL=`SELECT STUDENT_ID, NAME FROM STUDENT WHERE GRADE IN( SELECT GRADE_ID FROM GRADE_SUBJECT WHERE SUBJECT_ID=?) ORDER BY STUDENT_ID;`
     const [rows]= await DB.query(SQL, [SUBJECT_ID]);
     return res.status(200).json({
       response:rows,

@@ -3,7 +3,6 @@ import DbConnection from "../config/Database.js";
 export const SignIn = async (req, res) => {
     try {
       const { EMAIL, PASSWORD ,ROLE} = req.body;
-      console.log(EMAIL, PASSWORD ,ROLE)
       const DB = await DbConnection();
       const SQL = `SELECT NAME,STUDENT_ID, EMAIL FROM STUDENT WHERE EMAIL = ? AND PASSWORD = ?;`;
       const [rows] = await DB.query(SQL, [EMAIL, PASSWORD]);
@@ -57,35 +56,17 @@ export const GetGradeSubject=async (req, res) => {
     })
   }
 }
-export const GetAllGradeSubjectAttedance=async (req, res) => {
-  try{
-    const {STUDENT_ID}=req.user;
-    const {MONTH,YEAR}=req.query;
-    const DB=await DbConnection()
-    const SQL='SELECT SUBJECT_ID,ATTENDANCE_DATE FROM ATTENDANCE WHERE STUDENT_ID=? AND PRESENT=true AND MONTH(ATTENDANCE_DATE)=? AND YEAR(ATTENDANCE_DATE)=?;'
-    await DB.query(SQL,[STUDENT_ID,MONTH,YEAR])
-    return res.status(200).json({
-      message:"Get All Grade Subject Attendance Successfully",
-      status:true
-    });
-  }catch(error){
-    console.log("Error in GetAllGradeSubjectAttedance");
-    return res.status(400).json({
-      message:"Error in GetAllGradeSubjectAttedance",
-      success:false
-    })
-  }
-}
 export const GetGradeSubjectAttedance=async (req, res) => {
   try{
     const {STUDENT_ID}=req.user;
     const {MONTH,SUBJECT_ID,YEAR}=req.query;
     const DB=await DbConnection()
-    const SQL='SELECT ATTENDANCE_DATE FROM ATTENDANCE WHERE STUDENT_ID=? AND PRESENT=true AND MONTH(ATTENDANCE_DATE)=?AND YEAR(ATTENDANCE_DATE)=? AND SUBJECT_ID=?;'
+    const SQL='SELECT * FROM ATTENDANCE WHERE STUDENT_ID=? AND MONTH(ATTENDANCE_DATE)=? AND YEAR(ATTENDANCE_DATE)=? AND SUBJECT_ID=? ORDER BY DAY(ATTENDANCE_DATE);'
     const [rows]=await DB.query(SQL,[STUDENT_ID,MONTH,YEAR,SUBJECT_ID])
+    console.log(rows)
     return res.status(200).json({
       response:rows,
-      message:"Get All Grade Subject Attendance Successfully",
+      message:"Get Grade Subject Attendance Successfully",
       status:true
     });
   }catch(error){
