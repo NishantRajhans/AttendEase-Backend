@@ -1,11 +1,12 @@
 import jwt from "jsonwebtoken";
 import DbConnection from "../config/Database.js";
 const withDbConnection = async (callback) => {
-  const connection = await DbConnection(); 
+  const pool = await DbConnection();
+  const connection = await pool.getConnection();
   try {
     return await callback(connection);
   } finally {
-    await connection.end();
+    connection.release();
   }
 };
 export const SignIn = async (req, res) => {
