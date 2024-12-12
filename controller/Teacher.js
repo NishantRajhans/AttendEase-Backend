@@ -1,6 +1,5 @@
 import jwt from "jsonwebtoken";
 import DbConnection from "../config/Database.js";
-// Utility function for DB connection
 const withDbConnection = async (callback) => {
   const pool = await DbConnection();
   const connection = await pool.getConnection();

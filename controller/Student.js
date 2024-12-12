@@ -1,7 +1,5 @@
 import jwt from "jsonwebtoken";
 import DbConnection from "../config/Database.js";
-
-// Utility function for DB connection
 const withDbConnection = async (callback) => {
   const pool = await DbConnection();
   const connection = await pool.getConnection();
@@ -11,8 +9,6 @@ const withDbConnection = async (callback) => {
     connection.release();
   }
 };
-
-// SignIn Function
 export const SignIn = async (req, res) => {
   try {
     const { EMAIL, PASSWORD, ROLE } = req.body;
@@ -57,8 +53,6 @@ export const SignIn = async (req, res) => {
     });
   }
 };
-
-// GetGradeSubject Function
 export const GetGradeSubject = async (req, res) => {
   try {
     const { STUDENT_ID } = req.user;
@@ -98,8 +92,6 @@ export const GetGradeSubject = async (req, res) => {
     });
   }
 };
-
-// GetGradeSubjectAttendance Function
 export const GetGradeSubjectAttendance = async (req, res) => {
   try {
     const { STUDENT_ID } = req.user;
