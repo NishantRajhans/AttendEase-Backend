@@ -36,7 +36,7 @@ export const SignIn = async (req, res) => {
       message: "Teacher login successful",
     });
   } catch (err) {
-    console.log("Error in signin");
+    console.log("Error in signin",err);
     return res.status(200).json({
       message: "Error in signin",
       success: false,
