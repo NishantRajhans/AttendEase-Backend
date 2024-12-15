@@ -1,34 +1,26 @@
 import jwt from "jsonwebtoken";
-import DbConnection from "../config/Database.js";
-const withDbConnection = async (callback) => {
-  const pool = await DbConnection();
-  const connection = await pool.getConnection();
-  try {
-    return await callback(connection);
-  } finally {
-    connection.release();
-  }
-};
+import prisma from "../config/Database.js";
 export const SignIn = async (req, res) => {
   try {
-    const { EMAIL, PASSWORD, ROLE } = req.body;
-
-    const result = await withDbConnection(async (DB) => {
-      const SQL = `SELECT NAME, ADMIN_ID, EMAIL FROM ADMINISTRATOR WHERE EMAIL = ? AND PASSWORD = ?;`;
-      const [rows] = await DB.query(SQL, [EMAIL, PASSWORD]);
-      return rows;
+    const { email, password, role } = req.body;
+    if (!email || !password || !role) {
+      return res.status(401).json({
+        message: "All fields are required",
+        success: false,
+      });
+    }
+    const result = await prisma.administrator.findFirst({
+      where: { email: email, password: password },
     });
-
-    if (result.length === 0) {
+    if (!result) {
       return res.status(401).json({
         message: "Invalid credentials",
         success: false,
       });
     }
-
-    const user = result[0];
+    const user = result;
     const token = jwt.sign(
-      { EMAIL: user.EMAIL, ADMIN_ID: user.ADMIN_ID, ROLE },
+      { email: user.email, adminId: user.adminId, role },
       process.env.JWT_SECRET,
       { expiresIn: "24h" }
     );
@@ -43,7 +35,7 @@ export const SignIn = async (req, res) => {
       token,
       user,
       role: "Admin",
-      message: "Admin login successful",
+      message: "Admin login successfully",
     });
   } catch (err) {
     console.error("Error in signin", err);
@@ -56,15 +48,18 @@ export const SignIn = async (req, res) => {
 
 export const AddTeacher = async (req, res) => {
   try {
-    const { NAME, EMAIL, PASSWORD } = req.body;
-
-    await withDbConnection(async (DB) => {
-      const SQL = `INSERT INTO TEACHER (NAME, EMAIL, PASSWORD) VALUES (?, ?, ?);`;
-      await DB.query(SQL, [NAME, EMAIL, PASSWORD]);
+    const { name, email, password } = req.body;
+    if (!email || !password || !name) {
+      return res.status(401).json({
+        message: "All fields are required",
+        success: false,
+      });
+    }
+    await prisma.teacher.create({
+      data: { name: name, email: email, password: password },
     });
-
     return res.status(200).json({
-      message: "Add Teacher successful",
+      message: "Add Teacher successfully",
       success: true,
     });
   } catch (err) {
@@ -78,15 +73,25 @@ export const AddTeacher = async (req, res) => {
 
 export const AddStudent = async (req, res) => {
   try {
-    const { NAME, GRADE, ADDRESS, PHONENUMBER, EMAIL, PASSWORD } = req.body;
-
-    await withDbConnection(async (DB) => {
-      const SQL = `INSERT INTO STUDENT (NAME, GRADE, ADDRESS, PHONENUMBER, EMAIL, PASSWORD) VALUES (?, ?, ?, ?, ?, ?);`;
-      await DB.query(SQL, [NAME, GRADE, ADDRESS, PHONENUMBER, EMAIL, PASSWORD]);
+    const { name, grade, address, phoneNumber, email, password } = req.body;
+    if (!email || !password || !name || !phoneNumber || !grade || !address) {
+      return res.status(401).json({
+        message: "All fields are required",
+        success: false,
+      });
+    }
+    await prisma.student.create({
+      data: {
+        name: name,
+        grade: grade,
+        address: address,
+        phoneNumber: phoneNumber,
+        email: email,
+        password: password,
+      },
     });
-
     return res.status(200).json({
-      message: "Add Student successful",
+      message: "Add Student successfully",
       success: true,
     });
   } catch (err) {
@@ -100,31 +105,34 @@ export const AddStudent = async (req, res) => {
 
 export const AddSubject = async (req, res) => {
   try {
-    const { SUBJECT_NAME, GRADE_ID, TEACHER_ID } = req.body;
-
-    await withDbConnection(async (DB) => {
-      await DB.beginTransaction();
-
-      const SubjectSQL = `INSERT INTO SUBJECT (SUBJECT_NAME) VALUES (?);`;
-      await DB.query(SubjectSQL, [SUBJECT_NAME]);
-
-      const SubjectIdSQL = `SELECT SUBJECT_ID FROM SUBJECT WHERE SUBJECT_NAME = ?;`;
-      const [response] = await DB.query(SubjectIdSQL, [SUBJECT_NAME]);
-      const SUBJECT_ID = response[0].SUBJECT_ID;
-
-      const GradeToSubjectSQL = `INSERT INTO GRADE_SUBJECT (GRADE_ID, SUBJECT_ID) VALUES (?, ?);`;
-      await DB.query(GradeToSubjectSQL, [GRADE_ID, SUBJECT_ID]);
-
-      const AssignSubjectToTeacherSQL = `
-        INSERT INTO TEACHER_SUBJECT_ASSIGNMENT (TEACHER_ID, GRADE_ID, SUBJECT_ID) VALUES (?, ?, ?);
-      `;
-      await DB.query(AssignSubjectToTeacherSQL, [TEACHER_ID, GRADE_ID, SUBJECT_ID]);
-
-      await DB.commit();
+    const { subjectName, gradeId, teacherId } = req.body;
+    if (!subjectName || !gradeId || !teacherId) {
+      return res.status(401).json({
+        message: "All fields are required",
+        success: false,
+      });
+    }
+    await prisma.$transaction(async (prisma) => {
+      const subject = await prisma.subject.create({
+        data: { subjectName: subjectName },
+      });
+      await prisma.gradeSubject.create({
+        data: {
+          gradeId: Number(gradeId),
+          subjectId: Number(subject.subjectId),
+        },
+      });
+      await prisma.teacherSubjectAssignment.create({
+        data: {
+          teacherId: Number(teacherId),
+          gradeId: Number(gradeId),
+          subjectId: Number(subject.subjectId),
+        },
+      });
     });
 
     return res.status(200).json({
-      message: "Add Subject successful",
+      message: "Add Subject successfully",
       success: true,
     });
   } catch (err) {
@@ -138,15 +146,16 @@ export const AddSubject = async (req, res) => {
 
 export const DeleteStudent = async (req, res) => {
   try {
-    const { id: STUDENT_ID } = req.params;
-
-    await withDbConnection(async (DB) => {
-      const SQL = `DELETE FROM STUDENT WHERE STUDENT_ID = ?;`;
-      await DB.query(SQL, [STUDENT_ID]);
-    });
-
+    const { id: studentId } = req.params;
+    if (!studentId) {
+      return res.status(200).json({
+        message: "All fields are required",
+        success: false,
+      });
+    }
+    await prisma.student.delete({ where: { studentId: Number(studentId) } });
     return res.status(200).json({
-      message: "Delete Student successful",
+      message: "Delete Student successfully",
       success: true,
     });
   } catch (err) {
@@ -160,15 +169,16 @@ export const DeleteStudent = async (req, res) => {
 
 export const DeleteTeacher = async (req, res) => {
   try {
-    const { id: TEACHER_ID } = req.params;
-
-    await withDbConnection(async (DB) => {
-      const SQL = `DELETE FROM TEACHER WHERE TEACHER_ID = ?;`;
-      await DB.query(SQL, [TEACHER_ID]);
-    });
-
+    const { id: teacherId } = req.params;
+    if (!teacherId) {
+      return res.status(200).json({
+        message: "All fields are required",
+        success: false,
+      });
+    }
+    await prisma.teacher.delete({ where: { teacherId: Number(teacherId) } });
     return res.status(200).json({
-      message: "Delete Teacher successful",
+      message: "Delete Teacher successfully",
       success: true,
     });
   } catch (err) {
@@ -182,25 +192,39 @@ export const DeleteTeacher = async (req, res) => {
 
 export const DeleteSubject = async (req, res) => {
   try {
-    const { Subject, Grade, Teacher } = req.query;
-
-    await withDbConnection(async (DB) => {
-      await DB.beginTransaction();
-
-      const RemoveFromSubjectToTeacherSQL = `DELETE FROM TEACHER_SUBJECT_ASSIGNMENT WHERE SUBJECT_ID = ? AND GRADE_ID = ? AND TEACHER_ID = ?;`;
-      await DB.query(RemoveFromSubjectToTeacherSQL, [Subject, Grade, Teacher]);
-
-      const RemoveGradeToSubjectSQL = `DELETE FROM GRADE_SUBJECT WHERE GRADE_ID = ? AND SUBJECT_ID = ?;`;
-      await DB.query(RemoveGradeToSubjectSQL, [Grade, Subject]);
-
-      const RemoveSubjectSQL = `DELETE FROM SUBJECT WHERE SUBJECT_ID = ?;`;
-      await DB.query(RemoveSubjectSQL, [Subject]);
-
-      await DB.commit();
+    const { subjectId, gradeId, teacherId } = req.query;
+    if (!subjectId || !gradeId || !teacherId) {
+      return res.status(400).json({
+        message: "All fields are required",
+        success: false,
+      });
+    }
+    await prisma.$transaction(async (prisma) => {
+      await prisma.teacherSubjectAssignment.delete({
+        where: {
+          teacherId_subjectId_gradeId: {
+            teacherId: Number(teacherId),
+            subjectId: Number(subjectId),
+            gradeId: Number(gradeId),
+          },
+        },
+      });
+      await prisma.gradeSubject.delete({
+        where: {
+          gradeId_subjectId: {
+            gradeId: Number(gradeId),
+            subjectId: Number(subjectId),
+          },
+        },
+      });
+      await prisma.subject.delete({
+        where: {
+          subjectId: Number(subjectId),
+        },
+      });
     });
-
     return res.status(200).json({
-      message: "Delete Subject successful",
+      message: "Delete Subject successfully",
       success: true,
     });
   } catch (err) {
@@ -214,15 +238,14 @@ export const DeleteSubject = async (req, res) => {
 
 export const GetAllStudents = async (req, res) => {
   try {
-    const result = await withDbConnection(async (DB) => {
-      const SQL = `SELECT * FROM STUDENT;`;
-      const [rows] = await DB.query(SQL);
-      return rows;
-    });
-
+    const result = await prisma.student.findMany({});
+    const students = result.map((student) => ({
+      ...student,
+      phoneNumber: Number(student.phoneNumber),
+    }));
     return res.status(200).json({
-      response: result,
-      message: "Get All Students successful",
+      response: students,
+      message: "Get All Students successfully",
       success: true,
     });
   } catch (err) {
@@ -236,15 +259,10 @@ export const GetAllStudents = async (req, res) => {
 
 export const GetAllTeachers = async (req, res) => {
   try {
-    const result = await withDbConnection(async (DB) => {
-      const SQL = `SELECT * FROM TEACHER;`;
-      const [rows] = await DB.query(SQL);
-      return rows;
-    });
-
+    const result = await prisma.teacher.findMany({});
     return res.status(200).json({
       response: result,
-      message: "Get All Teachers successful",
+      message: "Get All Teachers successfully",
       success: true,
     });
   } catch (err) {
@@ -258,35 +276,28 @@ export const GetAllTeachers = async (req, res) => {
 
 export const GetAllSubjects = async (req, res) => {
   try {
-    const result = await withDbConnection(async (DB) => {
-      const SQL = `
-        SELECT 
-          S.SUBJECT_NAME AS SUBJECT,
-          S.SUBJECT_ID AS SUBJECT_ID, 
-          G.GRADE_NAME AS GRADE,
-          G.GRADE_ID AS GRADE_ID, 
-          T.NAME AS TEACHER,
-          T.TEACHER_ID AS TEACHER_ID
+    const result = await prisma.$queryRaw`
+        SELECT s."subjectName" AS subject,
+        s."subjectId" AS "subjectId", 
+        g."gradeName" AS grade,
+        g."gradeId" AS "gradeId", 
+        t.name AS teacher,
+        t."teacherId" AS "teacherId"
         FROM 
-          GRADE_SUBJECT GS
+        "GradeSubject" gs
         JOIN 
-          SUBJECT S ON GS.SUBJECT_ID = S.SUBJECT_ID
+        "Subject" s ON gs."subjectId" = s."subjectId"
         JOIN 
-          GRADE G ON GS.GRADE_ID = G.GRADE_ID
+        "Grade" g ON gs."gradeId" = g."gradeId"
         LEFT JOIN 
-          TEACHER_SUBJECT_ASSIGNMENT TSA ON GS.GRADE_ID = TSA.GRADE_ID AND GS.SUBJECT_ID = TSA.SUBJECT_ID
+        "TeacherSubjectAssignment" tsa ON gs."gradeId" = tsa."gradeId" AND gs."subjectId" = tsa."subjectId"
         LEFT JOIN 
-          TEACHER T ON TSA.TEACHER_ID = T.TEACHER_ID
+        "Teacher" t ON tsa."teacherId" = t."teacherId"
         ORDER BY 
-          S.SUBJECT_NAME, G.GRADE_NAME;
-      `;
-      const [rows] = await DB.query(SQL);
-      return rows;
-    });
-
+        s."subjectName", g."gradeName"`;
     return res.status(200).json({
       response: result,
-      message: "Get All Subjects with grades and teachers successful",
+      message: "Get All Subjects with grades and teachers successfully",
       success: true,
     });
   } catch (err) {
@@ -300,21 +311,16 @@ export const GetAllSubjects = async (req, res) => {
 
 export const GetAllGrades = async (req, res) => {
   try {
-    const result = await withDbConnection(async (DB) => {
-      const SQL = `SELECT * FROM GRADE;`;
-      const [rows] = await DB.query(SQL);
-      return rows;
-    });
-
+    const result = await prisma.grade.findMany({});
     return res.status(200).json({
       response: result,
-      message: "Get All Grades successful",
+      message: "Get All grades successfully",
       success: true,
     });
   } catch (err) {
-    console.error("Error in Get All Grades", err);
+    console.error("Error in Get All grades", err);
     return res.status(500).json({
-      message: "Error in Get All Grades",
+      message: "Error in Get All grades",
       success: false,
     });
   }
@@ -322,16 +328,35 @@ export const GetAllGrades = async (req, res) => {
 
 export const EditStudent = async (req, res) => {
   try {
-    const { NAME, GRADE, ADDRESS, PHONENUMBER, EMAIL, PASSWORD } = req.body;
-    const { id: STUDENT_ID } = req.params;
-
-    await withDbConnection(async (DB) => {
-      const SQL = `UPDATE STUDENT SET NAME = ?, GRADE = ?, ADDRESS = ?, PHONENUMBER = ?, EMAIL = ?, PASSWORD = ? WHERE STUDENT_ID = ?;`;
-      await DB.query(SQL, [NAME, GRADE, ADDRESS, PHONENUMBER, EMAIL, PASSWORD, STUDENT_ID]);
+    const { name, grade, address, phoneNumber, email, password } = req.body;
+    const { id: studentId } = req.params;
+    if (
+      !name ||
+      !grade ||
+      !address ||
+      !phoneNumber ||
+      !email ||
+      !password ||
+      !studentId
+    ) {
+      return res.status(400).json({
+        message: "All fields are required",
+        success: false,
+      });
+    }
+    await prisma.student.update({
+      where: { studentId: Number(studentId) },
+      data: {
+        name: name,
+        grade: grade,
+        address: address,
+        phoneNumber: phoneNumber,
+        email: email,
+        password: password,
+      },
     });
-
     return res.status(200).json({
-      message: "Edit Student successful",
+      message: "Edit Student successfully",
       success: true,
     });
   } catch (err) {
@@ -345,16 +370,20 @@ export const EditStudent = async (req, res) => {
 
 export const EditTeacher = async (req, res) => {
   try {
-    const { NAME, EMAIL, PASSWORD } = req.body;
-    const { id: TEACHER_ID } = req.params;
-
-    await withDbConnection(async (DB) => {
-      const SQL = `UPDATE TEACHER SET NAME = ?, EMAIL = ?, PASSWORD = ? WHERE TEACHER_ID = ?;`;
-      await DB.query(SQL, [NAME, EMAIL, PASSWORD, TEACHER_ID]);
+    const { name, email, password } = req.body;
+    const { id: teacherId } = req.params;
+    if (!name || !email || !password || !teacherId) {
+      return res.status(400).json({
+        message: "All fields are required",
+        success: false,
+      });
+    }
+    await prisma.teacher.update({
+      where: { teacherId: Number(teacherId) },
+      data: { name: name, email: email, password: password },
     });
-
     return res.status(200).json({
-      message: "Edit Teacher successful",
+      message: "Edit Teacher successfully",
       success: true,
     });
   } catch (err) {
@@ -368,26 +397,16 @@ export const EditTeacher = async (req, res) => {
 
 export const EditSubject = async (req, res) => {
   try {
-    const { TEACHER_ID, SUBJECT_NAME, GRADE_ID } = req.body;
-    const { id: SUBJECT_ID } = req.params;
-
-    await withDbConnection(async (DB) => {
-      await DB.beginTransaction();
-
-      const UpdateSubjectSQL = `UPDATE SUBJECT SET SUBJECT_NAME = ? WHERE SUBJECT_ID = ?;`;
-      await DB.query(UpdateSubjectSQL, [SUBJECT_NAME, SUBJECT_ID]);
-
-      const UpdateGradeSubjectSQL = `UPDATE GRADE_SUBJECT SET GRADE_ID = ? WHERE SUBJECT_ID = ?;`;
-      await DB.query(UpdateGradeSubjectSQL, [GRADE_ID, SUBJECT_ID]);
-
-      const UpdateTeacherAssignmentSQL = `UPDATE TEACHER_SUBJECT_ASSIGNMENT SET TEACHER_ID = ? WHERE SUBJECT_ID = ? AND GRADE_ID = ?;`;
-      await DB.query(UpdateTeacherAssignmentSQL, [TEACHER_ID, SUBJECT_ID, GRADE_ID]);
-
-      await DB.commit();
-    });
-
+    const { teacherId, subjectName, gradeId } = req.body;
+    const { id: subjectId } = req.params;
+    if (!teacherId || !subjectName || !gradeId || !subjectId) {
+      return res.status(400).json({
+        message: "All fields are required",
+        success: false,
+      });
+    }
     return res.status(200).json({
-      message: "Edit Subject successful",
+      message: "Edit Subject successfully",
       success: true,
     });
   } catch (err) {

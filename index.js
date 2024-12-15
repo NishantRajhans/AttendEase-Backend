@@ -1,12 +1,10 @@
 import express from 'express';
 import dotenv from 'dotenv';
-import DbConnection from './config/Database.js';
 import AdminRouter from './routes/Admin.js';
 import TeacherRouter from './routes/Teacher.js';
 import StudentRouter from './routes/Student.js';
 import cors from "cors"
 dotenv.config();
-DbConnection();
 const app = express();
 app.use(cors());
 app.use(express.json());

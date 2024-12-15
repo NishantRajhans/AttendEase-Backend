@@ -1,34 +1,25 @@
 import jwt from "jsonwebtoken";
-import DbConnection from "../config/Database.js";
-const withDbConnection = async (callback) => {
-  const pool = await DbConnection();
-  const connection = await pool.getConnection();
-  try {
-    return await callback(connection);
-  } finally {
-    connection.release();
-  }
-};
+import prisma from "../config/Database.js";
 export const SignIn = async (req, res) => {
   try {
-    const { EMAIL, PASSWORD, ROLE } = req.body;
-
-    const result = await withDbConnection(async (DB) => {
-      const SQL = `SELECT NAME, STUDENT_ID, EMAIL FROM STUDENT WHERE EMAIL = ? AND PASSWORD = ?;`;
-      const [rows] = await DB.query(SQL, [EMAIL, PASSWORD]);
-      return rows;
+    const { email, password, role } = req.body;
+    if (!email || !password || !role) {
+      return res.status(401).json({
+        message: "All fields are required",
+        success: false,
+      });
+    }
+    const user = await prisma.student.findFirst({
+      where: { email: email, password: password },
     });
-
-    if (result.length === 0) {
+    if (!user) {
       return res.status(401).json({
         message: "Invalid credentials",
         success: false,
       });
     }
-
-    const user = result[0];
     const token = jwt.sign(
-      { EMAIL: user.EMAIL, STUDENT_ID: user.STUDENT_ID, ROLE },
+      { email: user.email, studentId: user.studentId, role },
       process.env.JWT_SECRET,
       { expiresIn: "24h" }
     );
@@ -37,11 +28,10 @@ export const SignIn = async (req, res) => {
       expires: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
       httpOnly: true,
     };
-
     return res.cookie("token", token, options).status(200).json({
       success: true,
       token,
-      user,
+      user:{...user,phoneNumber:Number(user.phoneNumber)},
       role: "Student",
       message: "Student login successful",
     });
@@ -55,30 +45,25 @@ export const SignIn = async (req, res) => {
 };
 export const GetGradeSubject = async (req, res) => {
   try {
-    const { STUDENT_ID } = req.user;
-
-    const result = await withDbConnection(async (DB) => {
-      const SQL = `
-        SELECT * 
-        FROM SUBJECT 
-        WHERE SUBJECT_ID IN (
-          SELECT SUBJECT_ID 
-          FROM GRADE_SUBJECT 
-          WHERE GRADE_ID IN (
-            SELECT GRADE_ID 
-            FROM GRADE 
-            WHERE GRADE_NAME IN (
-              SELECT GRADE 
-              FROM STUDENT 
-              WHERE STUDENT_ID = ?
-            )
-          )
-        );
-      `;
-      const [rows] = await DB.query(SQL, [STUDENT_ID]);
-      return rows;
-    });
-
+    const { studentId } = req.user;
+    if (!studentId) {
+      return res.status(401).json({
+        message: "All fields are required",
+        success: false,
+      });
+    }
+    const result = await prisma.$queryRaw`
+          SELECT * FROM "Subject" 
+          WHERE "subjectId" IN (
+          SELECT "subjectId" 
+          FROM "GradeSubject" 
+          WHERE "gradeId" IN (
+          SELECT "gradeId" 
+          FROM "Grade" 
+          WHERE "gradeName" IN (
+          SELECT grade 
+          FROM "Student" 
+          WHERE "studentId" = ${Number(studentId)})))`;
     return res.status(200).json({
       response: result,
       message: "Get All Grade Subjects successful",
@@ -94,23 +79,21 @@ export const GetGradeSubject = async (req, res) => {
 };
 export const GetGradeSubjectAttendance = async (req, res) => {
   try {
-    const { STUDENT_ID } = req.user;
-    const { MONTH, SUBJECT_ID, YEAR } = req.query;
-
-    const result = await withDbConnection(async (DB) => {
-      const SQL = `
-        SELECT * 
-        FROM ATTENDANCE 
-        WHERE STUDENT_ID = ? 
-          AND MONTH(ATTENDANCE_DATE) = ? 
-          AND YEAR(ATTENDANCE_DATE) = ? 
-          AND SUBJECT_ID = ? 
-        ORDER BY DAY(ATTENDANCE_DATE);
-      `;
-      const [rows] = await DB.query(SQL, [STUDENT_ID, MONTH, YEAR, SUBJECT_ID]);
-      return rows;
-    });
-
+    const { studentId } = req.user;
+    const { month, subjectId, year } = req.query;
+    if (!month || !subjectId || !year || !studentId) {
+      return res.status(401).json({
+        message: "All fields are required",
+        success: false,
+      });
+    }
+    const result = await prisma.$queryRaw`SELECT * 
+                  FROM "Attendance" 
+                  WHERE "studentId" = ${studentId} 
+                  AND EXTRACT(MONTH FROM "attendanceDate") = ${Number(month)} 
+                  AND EXTRACT(YEAR FROM "attendanceDate") = ${Number(year)} 
+                  AND "subjectId" = ${Number(subjectId)} 
+                  ORDER BY DATE("attendanceDate")`;
     return res.status(200).json({
       response: result,
       message: "Get Grade Subject Attendance successful",

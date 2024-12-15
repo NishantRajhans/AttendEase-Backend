@@ -1,23 +1,17 @@
 import jwt from "jsonwebtoken";
-import DbConnection from "../config/Database.js";
-const withDbConnection = async (callback) => {
-  const pool = await DbConnection();
-  const connection = await pool.getConnection();
-  try {
-    return await callback(connection);
-  } finally {
-    connection.release();
-  }
-};
+import prisma from "../config/Database.js";
 export const SignIn = async (req, res) => {
   try {
-    const { EMAIL, PASSWORD, ROLE } = req.body;
-    const user = await withDbConnection(async (connection) => {
-      const SQL = `SELECT NAME, TEACHER_ID, EMAIL FROM TEACHER WHERE EMAIL = ? AND PASSWORD = ?;`;
-      const [rows] = await connection.query(SQL, [EMAIL, PASSWORD]);
-      return rows.length > 0 ? rows[0] : null;
+    const { email, password, role } = req.body;
+    if(!email||!password||!role){
+      return res.status(200).json({
+        message: "All fields are required",
+        success: false,
+      });
+    }
+    const user = await prisma.teacher.findFirst({
+      where: { email: password, email: email },
     });
-
     if (!user) {
       return res.status(200).json({
         message: "Invalid credentials",
@@ -26,7 +20,7 @@ export const SignIn = async (req, res) => {
     }
 
     const token = jwt.sign(
-      { EMAIL: user.EMAIL, TEACHER_ID: user.TEACHER_ID, ROLE: ROLE },
+      { email: user.email, teacherId: user.teacherId, role: role },
       process.env.JWT_SECRET,
       { expiresIn: "24h" }
     );
@@ -42,8 +36,8 @@ export const SignIn = async (req, res) => {
       message: "Teacher login successful",
     });
   } catch (err) {
-    console.log("Error in signin", err);
-    return res.status(400).json({
+    console.log("Error in signin");
+    return res.status(200).json({
       message: "Error in signin",
       success: false,
     });
@@ -52,71 +46,79 @@ export const SignIn = async (req, res) => {
 
 export const PutAttendance = async (req, res) => {
   try {
-    const { STUDENT_ID, SUBJECT_ID, PRESENT, ATTENDANCE_DATE } = req.body;
-    const { TEACHER_ID } = req.user;
-
-    const attendanceExists = await withDbConnection(async (connection) => {
-      const FindSQL = `SELECT * FROM ATTENDANCE WHERE SUBJECT_ID=? AND TEACHER_ID=? AND ATTENDANCE_DATE=? AND STUDENT_ID=?;`;
-      const [rows] = await connection.query(FindSQL, [SUBJECT_ID, TEACHER_ID, ATTENDANCE_DATE, STUDENT_ID]);
-      return rows.length > 0;
-    });
-
-    if (attendanceExists) {
-      return res.json({
-        message: "Attendance of this date and subject is already taken.",
+    const { studentId, subjectId, present, attendanceDate } = req.body;
+    const { teacherId } = req.user;
+    if(!studentId||!subjectId||!present||!attendanceDate,!teacherId){
+      return res.status(200).json({
+        message: "All fields are required",
+        success: false,
       });
     }
-
-    await withDbConnection(async (connection) => {
-      const SQL = `INSERT INTO ATTENDANCE (STUDENT_ID, SUBJECT_ID, TEACHER_ID, PRESENT, ATTENDANCE_DATE) VALUES (?, ?, ?, ?, ?);`;
-      await connection.query(SQL, [STUDENT_ID, SUBJECT_ID, TEACHER_ID, PRESENT, ATTENDANCE_DATE]);
+    const formattedDate = new Date(attendanceDate);
+    if (isNaN(formattedDate)) {
+      return res.status(400).json({
+        message: "Invalid attendance date format.",
+      });
+    }
+    const attendanceExists = await prisma.attendance.findFirst({
+      where: {
+        studentId: Number(studentId),
+        teacherId: Number(teacherId),
+        attendanceDate: formattedDate,
+        subjectId: Number(subjectId),
+      },
     });
-
-    return res.json({
+    if (attendanceExists) {
+      return res.status(400).json({
+        message: "Attendance of this date and subject is already taken.",
+        success:false
+      });
+    }
+    await prisma.attendance.create({
+      data: {
+        studentId: Number(studentId),
+        teacherId: Number(teacherId),
+        present: Boolean(present),
+        attendanceDate: formattedDate,
+        subjectId: Number(subjectId),
+      },
+    });
+    return res.status(200).json({
       message: "Put Attendance successful",
+      success:true
     });
   } catch (err) {
     console.log("Error in Put Attendance", err);
-    return res.status(400).json({
+    return res.status(200).json({
       message: "Error in Put Attendance",
       success: false,
     });
   }
 };
-
-export const RemoveAttendance = async (req, res) => {
-  try {
-    const { STUDENT_ID, SUBJECT_ID, ATTENDANCE_DATE } = req.query;
-    const { TEACHER_ID } = req.user;
-
-    await withDbConnection(async (connection) => {
-      const SQL = `DELETE FROM ATTENDANCE WHERE STUDENT_ID = ? AND SUBJECT_ID = ? AND TEACHER_ID = ? AND ATTENDANCE_DATE = ?;`;
-      await connection.query(SQL, [STUDENT_ID, SUBJECT_ID, TEACHER_ID, ATTENDANCE_DATE]);
-    });
-
-    return res.json({
-      message: "Remove Attendance successful",
-    });
-  } catch (err) {
-    console.log("Error in Remove Attendance", err);
-    return res.status(400).json({
-      message: "Error in Remove Attendance",
-      success: false,
-    });
-  }
-};
-
 export const FetchAttendance = async (req, res) => {
   try {
-    const { Subject, Month, Year } = req.query;
-
-    const rows = await withDbConnection(async (connection) => {
-      const SQL = `SELECT * FROM ATTENDANCE WHERE SUBJECT_ID=? AND MONTH(ATTENDANCE_DATE)=? AND YEAR(ATTENDANCE_DATE)=? ORDER BY ATTENDANCE_DATE;`;
-      const [rows] = await connection.query(SQL, [Subject, Month, Year]);
-      return rows;
+    const { subjectId, month, year } = req.query;
+    if(!subjectId||!month||!year){
+      return res.status(200).json({
+        message: "All fields are required",
+        success: false,
+      });
+    }
+    const startOfMonth = new Date(year, month - 1, 1);
+    const endOfMonth = new Date(year, month, 0, 23, 59, 59, 999);
+    const rows = await prisma.attendance.findMany({
+      where: {
+        subjectId: Number(subjectId),
+        attendanceDate: {
+          gte: startOfMonth,
+          lte: endOfMonth,
+        },
+      },
+      orderBy: {
+        attendanceDate: "asc",
+      },
     });
-
-    if (rows.length === 0) {
+    if (!rows) {
       return res.status(200).json({
         message: "No attendance records found",
         success: false,
@@ -130,7 +132,7 @@ export const FetchAttendance = async (req, res) => {
     });
   } catch (err) {
     console.log("Error in Fetch Attendance", err);
-    return res.status(400).json({
+    return res.status(200).json({
       message: "Error in Fetch Attendance",
       success: false,
     });
@@ -139,37 +141,41 @@ export const FetchAttendance = async (req, res) => {
 
 export const FetchTotalPresent = async (req, res) => {
   try {
-    const { Subject, Month, Year } = req.query;
-    const { TEACHER_ID } = req.user;
-
-    const rows = await withDbConnection(async (connection) => {
-      const SQL = `SELECT 
-        DAY(ATTENDANCE.ATTENDANCE_DATE) AS ATTENDANCE_DAY,
-        COUNT(ATTENDANCE.ATTENDANCE_ID) AS presentCount
-        FROM ATTENDANCE
-        LEFT JOIN STUDENT ON STUDENT.STUDENT_ID = ATTENDANCE.STUDENT_ID
-        WHERE STUDENT.GRADE IN (SELECT GRADE_ID FROM GRADE_SUBJECT WHERE SUBJECT_ID = ?)
-        AND MONTH(ATTENDANCE.ATTENDANCE_DATE) = ? 
-        AND YEAR(ATTENDANCE.ATTENDANCE_DATE) = ? 
-        AND ATTENDANCE.SUBJECT_ID = ?  
-        AND TEACHER_ID = ?
-        AND ATTENDANCE.PRESENT = true 
-        GROUP BY ATTENDANCE_DAY
-        ORDER BY ATTENDANCE_DAY;`;
-
-      const [rows] = await connection.query(SQL, [Subject, Month, Year, Subject, TEACHER_ID]);
-      return rows;
-    });
-
+    const { subjectId, month, year } = req.query;
+    const { teacherId } = req.user;
+    if(!subjectId||!month||!year||!teacherId){
+      return res.status(200).json({
+        message: "All fields are required",
+        success: false,
+      });
+    }
+    const rows = await prisma.$queryRaw`
+    SELECT 
+    EXTRACT(DAY FROM "Attendance"."attendanceDate") AS attendanceDay,
+        COUNT("Attendance"."attendanceId") AS presentCount
+          FROM "Attendance"
+            LEFT JOIN "Student" ON "Student"."studentId" = "Attendance"."studentId"
+              WHERE "Student".grade IN (SELECT "gradeName" FROM "Grade" INNER JOIN "GradeSubject" ON "Grade"."gradeId" = "GradeSubject"."gradeId" WHERE "GradeSubject"."subjectId" = ${Number(subjectId)})
+                  AND EXTRACT(MONTH FROM "Attendance"."attendanceDate") = ${Number(month)}
+                      AND EXTRACT(YEAR FROM "Attendance"."attendanceDate") = ${Number(year)}
+                          AND "Attendance"."subjectId" = ${Number(subjectId)}
+                              AND "Attendance"."teacherId" = ${Number(teacherId)}
+                                  AND "Attendance".present = true
+                                    GROUP BY attendanceDay
+                                      ORDER BY attendanceDay`;
+    const rowsWithNumbers = rows.map((row) => ({
+      attendanceDay: Number(row.attendanceday),
+      presentCount: Number(row.presentcount),
+    }));
     return res.json({
       message: "Fetch Attendance successfully",
-      response: rows,
+      response: rowsWithNumbers,
       success: true,
     });
   } catch (err) {
-    console.log("Error in Fetch Total Present", err);
-    return res.status(400).json({
-      message: "Error in Fetch Total Present",
+    console.log("Error in Fetch Total present", err);
+    return res.status(200).json({
+      message: "Error in Fetch Total present",
       success: false,
     });
   }
@@ -177,22 +183,30 @@ export const FetchTotalPresent = async (req, res) => {
 
 export const FetchSubject = async (req, res) => {
   try {
-    const { TEACHER_ID } = req.user;
-
-    const response = await withDbConnection(async (connection) => {
-      const SQL = `SELECT * FROM SUBJECT WHERE SUBJECT_ID IN(SELECT TEACHER_SUBJECT_ASSIGNMENT.SUBJECT_ID FROM TEACHER_SUBJECT_ASSIGNMENT WHERE TEACHER_ID=?);`;
-      const [rows] = await connection.query(SQL, [TEACHER_ID]);
-      return rows;
+    const { teacherId } = req.user;
+    if(!teacherId){
+      return res.status(400).json({
+        message: "All fields are required",
+        success: false,
+      });
+    }
+    const response = await prisma.subject.findMany({
+      where: {
+        teacherSubjectAssignments: {
+          some: {
+            teacherId: teacherId,
+          },
+        },
+      },
     });
-
-    return res.json({
+    return res.status(200).json({
       message: "Fetch Subject successfully",
       response: response,
       success: true,
     });
   } catch (err) {
-    console.log("Error in Fetch Subject", err);
-    return res.status(400).json({
+    console.log("Error in Fetch Subject");
+    return res.status(200).json({
       message: "Error in Fetch Subject",
       success: false,
     });
@@ -201,24 +215,25 @@ export const FetchSubject = async (req, res) => {
 
 export const FetchStudentOfParticularSubject = async (req, res) => {
   try {
-    const { SUBJECT_ID } = req.query;
-
-    const rows = await withDbConnection(async (connection) => {
-      const SQL = `SELECT STUDENT_ID, NAME FROM STUDENT WHERE GRADE IN (SELECT GRADE_ID FROM GRADE_SUBJECT WHERE SUBJECT_ID=?) ORDER BY STUDENT_ID;`;
-      const [rows] = await connection.query(SQL, [SUBJECT_ID]);
-      return rows;
-    });
-
+    const { subjectId } = req.query;
+    if(!subjectId){
+      return res.status(400).json({
+        message: "All fields are required",
+        success: false,
+      });
+    }
+    const rows =
+      await prisma.$queryRaw`SELECT "studentId", name FROM "Student" WHERE grade IN (SELECT "gradeName" FROM "Grade" INNER JOIN "GradeSubject" ON "Grade"."gradeId" = "GradeSubject"."gradeId" WHERE "GradeSubject"."subjectId" =${ Number(subjectId)}) ORDER BY "studentId"`;
     return res.status(200).json({
       response: rows,
       message: "Student fetch Successfully",
       success: true,
     });
   } catch (err) {
-    return res.status(400).json({
+    console.log(err);
+    return res.status(200).json({
       message: "Error in FetchStudentOfParticularSubject",
       success: false,
     });
   }
 };
-

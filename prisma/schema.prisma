@@ -1,0 +1,86 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Administrator {
+  adminId  Int    @id @default(autoincrement())
+  name     String @db.VarChar(50)
+  email    String @unique @db.VarChar(100)
+  password String @db.VarChar(100)
+}
+model Teacher {
+  teacherId Int    @id @default(autoincrement())
+  name      String @db.VarChar(50)
+  email     String @unique @db.VarChar(100)
+  password  String @db.VarChar(100)
+  teacherSubjectAssignments TeacherSubjectAssignment[]
+  attendances Attendance[]
+}
+
+model Student {
+  studentId   Int     @id @default(autoincrement())
+  name        String  @db.VarChar(50)
+  grade       String  @db.VarChar(10)
+  address     String? @db.VarChar(100)
+  phoneNumber BigInt?
+  email       String  @unique @db.VarChar(100)
+  password    String  @db.VarChar(100)
+  attendances Attendance[]
+}
+
+model Subject {
+  subjectId   Int    @id @default(autoincrement())
+  subjectName String @db.VarChar(50) @unique
+  gradeSubjects GradeSubject[]
+  attendances Attendance[]
+  teacherSubjectAssignments TeacherSubjectAssignment[]
+}
+
+model Grade {
+  gradeId   Int    @id @default(autoincrement())
+  gradeName String @db.VarChar(10)
+  gradeSubjects GradeSubject[]
+  teacherSubjectAssignments TeacherSubjectAssignment[]
+}
+
+model GradeSubject {
+  gradeSubjectId Int @id @default(autoincrement())
+  gradeId        Int
+  subjectId      Int
+
+  grade   Grade   @relation(fields: [gradeId], references: [gradeId], onDelete: Cascade)
+  subject Subject @relation(fields: [subjectId], references: [subjectId], onDelete: Cascade)
+
+  @@unique([gradeId, subjectId]) 
+}
+
+model Attendance {
+  attendanceId   Int      @id @default(autoincrement())
+  studentId      Int
+  subjectId      Int
+  teacherId      Int
+  present        Boolean  @default(false)
+  attendanceDate DateTime
+
+  student Student @relation(fields: [studentId], references: [studentId], onDelete: Cascade)
+  subject Subject @relation(fields: [subjectId], references: [subjectId])
+  teacher Teacher @relation(fields: [teacherId], references: [teacherId])
+}
+
+model TeacherSubjectAssignment {
+  assignmentId Int @id @default(autoincrement())
+  teacherId    Int
+  subjectId    Int
+  gradeId      Int
+
+  teacher Teacher @relation(fields: [teacherId], references: [teacherId])
+  subject Subject @relation(fields: [subjectId], references: [subjectId])
+  grade   Grade   @relation(fields: [gradeId], references: [gradeId])
+
+  @@unique([teacherId, subjectId, gradeId]) 
+}

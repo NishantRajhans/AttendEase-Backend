@@ -10,7 +10,7 @@ export const AuthMiddleware = async (req, res, next) => {
 		try {
 			const decode = jwt.verify(token, process.env.JWT_SECRET);
 			req.user = decode;
-			if(req.user.ROLE!="Admin"){
+			if(req.user.role!="Admin"){
 				return res.status(401).json({
 					message:"This route is Administrator protected"
 				})
