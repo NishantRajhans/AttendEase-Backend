@@ -74,6 +74,7 @@ export const PutAttendance = async (req, res) => {
         success:false
       });
     }
+    console.log(studentId, subjectId, present, attendanceDate,formattedDate,teacherId)
     await prisma.attendance.create({
       data: {
         studentId: Number(studentId),
